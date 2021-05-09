@@ -1,45 +1,52 @@
-import React, { useState } from 'react'
-import logo from './logo.svg'
-import './App.css'
+import React from 'react'
+import * as  esbuild from "esbuild-wasm"
 
-function App() {
-  const [count, setCount] = useState(0)
+import {unpkgPathPlugin} from "./plugins/unpkg-path-finder"
 
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>Hello Vite + React!</p>
-        <p>
-          <button onClick={() => setCount((count) => count + 1)}>
-            count is: {count}
-          </button>
-        </p>
-        <p>
-          Edit <code>App.tsx</code> and save to test HMR updates.
-        </p>
-        <p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-          {' | '}
-          <a
-            className="App-link"
-            href="https://vitejs.dev/guide/features.html"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Vite Docs
-          </a>
-        </p>
-      </header>
-    </div>
-  )
+export default function App() {
+    const [code, setCode] = React.useState<string | number | readonly string[] | undefined>('')
+    const [result, setResult]  =React.useState<string | number | readonly string[] | undefined>('')
+    const esBuildRef = React.useRef<Boolean>(false)
+
+    const handleFormSubmit = async (evt: React.FormEvent<HTMLFormElement>) => {
+        evt.preventDefault()
+
+        if(code !==undefined && esBuildRef.current){
+            try {
+                console.log(code?.toString())
+                const bundledCode = await esbuild.build({
+                    entryPoints:['index.js'],
+                    bundle:true, 
+                    write:false,
+                    plugins:[unpkgPathPlugin()]
+                })
+                console.log("Bundling success", bundledCode)
+                setResult(bundledCode.outputFiles[0].text)
+    
+            } catch (error) {
+                console.log("Bundling error", {error})
+            }
+
+        }
+    }
+
+    const handleTextAreaChange = (evt:React.ChangeEvent<HTMLTextAreaElement>) => {
+        setCode(evt.target.value)
+    }
+
+    React.useLayoutEffect(() => {
+        if(!esBuildRef.current){
+            esbuild.initialize({worker:true, wasmURL:'./node_modules/esbuild-wasm/esbuild.wasm'}).then(() => {esBuildRef.current=true}).catch(() => null)
+        }
+    },[])
+    
+    return (
+        <div>
+            <form onSubmit={handleFormSubmit}>
+                <textarea name="code" cols={100} rows={10} value={code} onChange={handleTextAreaChange}  /> 
+                <button type="submit">Submit</button>
+            </form>
+            {result}
+        </div>
+    )
 }
-
-export default App
